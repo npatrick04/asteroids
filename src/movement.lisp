@@ -23,19 +23,30 @@
   (make-vec2 :x (- (vec2-x a) (vec2-x b))
 	     :y (- (vec2-y a) (vec2-y b))))
 
+(defconstant +full-circle+ 365.0)
+
 (defclass moving-object ()
-  ((pos :accessor pos
-	:initform (make-vec2)
-	:type 'vec2
+  ((pos :accessor pos                   ;Meters
+	:initform (make-vec2)           ;#(0 0) is center of the screen
+	:type 'vec2                     ;#(+ +) is up and right
 	:initarg :pos)
-   (vel :accessor vel
-	:initform (make-vec2)
+   (vel :accessor vel                   ;Meters per second
+	:initform (make-vec2)           ;Same directional orientation as position
 	:type 'vec2
 	:initarg :vel)
-   (attitude :accessor attitude
-	     :initform 0.0
-	     :type 'single-float
-	     :initarg :attitude)))
+   (attitude :accessor attitude         ;Degrees
+	     :initform 0.0              ;Attitude is +degrees counter-clockwise
+	     :type 'single-float        ;Zero to the right
+	     :initarg :attitude)
+   (attitude-rate :accessor attitude-rate  ;Degrees per second
+                  :initform 0.0            ;Same convention as attitude
+                  :type 'single-float
+                  :initarg :attitude)
+   (timestamp :accessor timestamp       ;The valid time of the object
+              :initarg :timestamp)
+   (resource :accessor resource
+             :initform (error "Objects must be created with resources")
+             :initarg :resource)))
 
 (defclass massy-object (moving-object)
   ((mass :accessor mass
@@ -44,15 +55,20 @@
 	 :initarg :mass)))
 
 (defgeneric move (object deltat))
-(defgeneric force (object force deltat))
-
 (defmethod move ((object moving-object) deltat)
-  (setf (pos object) (vec2+ (pos object)
-			    (vec2* (vel object) deltat))))
+  (with-slots (pos vel attitude attitude-rate) object
+    (setf pos (vec2+ pos (vec2* vel deltat))
 
+          attitude (mod (+ attitude attitude-rate)
+                        +full-circle+))))
+
+(defgeneric force (object force deltat))
 (defmethod force ((object massy-object) (force vec2) deltat)
   (let ((accel (vec2/ force (mass object))))
     (setf (vel object) (vec2+ (vel object) (vec2* accel deltat)))))
+
+(deftype gun-command-types ()
+  `(member fire cease-fire))
 
 (defclass projectile (massy-object)
   ())
@@ -79,5 +95,16 @@
   (assert (member round '(bullet) :key #'eq))
   (setf (round-type gun) round))
 
+(deftype thrust-type ()
+  `(member fwd bkwd ccw cw coast))
+
+;;; Commands are added to a queue with their timestamp for later
+;;; processing by TICK. 
 (defclass ship (massy-object)
-  ())
+  ((thrust-command :accessor thrust-command ;The user command direction
+                   :initform nil
+                   :type (or nil thrust-type))
+   (command-start-time :accessor command-start-time
+                       :initform 0)
+   (gun :accessor gun
+        :initform (make-instance 'gun))))

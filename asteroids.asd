@@ -5,7 +5,8 @@
   :author "Your Name <your.name@example.com>"
   :license "Specify license here"
   :depends-on (#:sdl2
-               #:sdl2-image)
+               #:sdl2-image
+               #:queues.simple-queue)
   :serial t
   :components ((:module "src"
                         :components
@@ -13,5 +14,6 @@
                          (:file "resources")
                          (:file "render")
                          (:file "asteroids")
-                         (:file "movement")))))
+                         (:file "movement")
+                         (:file "game")))))
 

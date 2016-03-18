@@ -12,6 +12,12 @@
 (defparameter *seconds-per-frame* (/ 1.0 *frame-rate*))
 (defparameter *ireal-time-per-frame* (/ internal-time-units-per-second *frame-rate*))
 
+(deftype command-type ()
+  `(member movement weapon))
+
+(defstruct command time type content)
+(defparameter *user-commands* (make-queue :simple-queue))
+
 (defun asteroids ()
   (sdl2:with-init (:everything)
     (sdl2:with-window (win :title "Asteroids" :w +screen-width+ :h +screen-height+ :flags '(:shown))
@@ -26,21 +32,57 @@
 	     (:keysym keysym)
 
 	     ;; Is there a better and less-verbose way to do this?
-	     (let ((scancode (sdl2:scancode-value keysym)))
+	     (let ((scancode (sdl2:scancode-value keysym))
+                   (the-time (get-internal-real-time)))
                (cond
-		 ;; possibly make these configurable...probably not
-                 ((sdl2:scancode= scancode :scancode-w) )
-                 ((sdl2:scancode= scancode :scancode-s) )
-                 ((sdl2:scancode= scancode :scancode-a) )
-                 ((sdl2:scancode= scancode :scancode-d) )
-		 ;; TODO: Arrow keys
-		 )))
-
+                 ;; possibly make these configurable...probably not
+                 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'fwd)))
+                 ((sdl2:scancode= scancode :scancode-s) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'bkwd)))
+                 ((sdl2:scancode= scancode :scancode-a) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'ccw)))
+                 ((sdl2:scancode= scancode :scancode-d) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'cw)))
+                 ((sdl2:scancode= scancode :scancode-space) (qpush *user-commands*
+                                                                   (make-command :time the-time
+                                                                                 :type 'weapon
+                                                                                 :content 'fire))))))
 	    (:keyup
              (:keysym keysym)
-             (when (sdl2:scancode= (sdl2:scancode-value keysym) :scancode-escape)
-               (sdl2:push-event :quit)))
-	    
+	     (let ((scancode (sdl2:scancode-value keysym))
+                   (the-time (get-internal-real-time)))
+               (cond
+                 ;; possibly make these configurable...probably not
+                 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'coast)))
+                 ((sdl2:scancode= scancode :scancode-s) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'coast)))
+                 ((sdl2:scancode= scancode :scancode-a) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'coast)))
+                 ((sdl2:scancode= scancode :scancode-d) (qpush *user-commands*
+                                                               (make-command :time the-time
+                                                                             :type 'movement
+                                                                             :content 'coast)))
+                 ((sdl2:scancode= scancode :scancode-space) (qpush *user-commands*
+                                                                   (make-command :time the-time
+                                                                                 :type 'weapon
+                                                                                 :content 'cease-fire)))
+                 ((sdl2:scancode= scancode :scancode-escape) (sdl2:push-event :quit)))))
 	    (:idle
 	     ()
 	     (sdl2:render-clear ren)
