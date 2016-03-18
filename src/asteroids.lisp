@@ -17,7 +17,7 @@
     (sdl2:with-window (win :title "Asteroids" :w +screen-width+ :h +screen-height+ :flags '(:shown))
       (sdl2:with-renderer (ren win :flags '(:accelerated :presentvsync))
 	(let ((sprites (load-texture (merge-pathnames
-				      "asteroids.png"
+				      "resources/asteroids.png"
 				      (ql:where-is-system :asteroids))
 				     ren))
 	      (time (get-internal-real-time)))

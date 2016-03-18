@@ -7,9 +7,11 @@
   :depends-on (#:sdl2
                #:sdl2-image)
   :serial t
-  :components ((:file "package")
-	       (:file "resources")
-	       (:file "render")
-               (:file "asteroids")
-	       (:file "movement")))
+  :components ((:module "src"
+                        :components
+                        ((:file "package")
+                         (:file "resources")
+                         (:file "render")
+                         (:file "asteroids")
+                         (:file "movement")))))
 

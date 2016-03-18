@@ -74,9 +74,10 @@
 (defmethod fire ((gun gun) time)
   (setf (last-fire-time gun) time))
 
-(defgeneric load (gun round &key &allow-other-keys))
-(defmethod load ((gun gun) (round :eql bullet) &key)
-  (setf (round-type gun 'bullet)))
+(defgeneric reload (gun round &key &allow-other-keys))
+(defmethod reload ((gun gun) round &key)
+  (assert (member round '(bullet) :key #'eq))
+  (setf (round-type gun) round))
 
 (defclass ship (massy-object)
   ())
