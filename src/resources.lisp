@@ -1,9 +1,17 @@
 (in-package #:asteroids)
 
+(defun project-relative-path (path)
+  (merge-pathnames path (asdf:system-definition-pathname :asteroids)))
+
+(defun load-sprites (renderer)
+  (load-texture (project-relative-path "resources/asteroids.png")
+		renderer))
+
 ;;; Undoubtedtly there is a better way to do this...
 (defun read-sprites ()
   (let ((sprite-specs
-	 (with-open-file (in "src/sprite-details.lisp")
+	 (with-open-file (in (project-relative-path
+			      "src/sprite-details.lisp"))
 	   (read in)))
 	(sprites (make-hash-table)))
     ;; The sprites are split in groups (ships big medium little),

@@ -22,10 +22,7 @@
   (sdl2:with-init (:everything)
     (sdl2:with-window (win :title "Asteroids" :w +screen-width+ :h +screen-height+ :flags '(:shown))
       (sdl2:with-renderer (ren win :flags '(:accelerated :presentvsync))
-	(let ((sprites (load-texture (merge-pathnames
-				      "resources/asteroids.png"
-				      (ql:where-is-system :asteroids))
-				     ren))
+	(let ((sprites (load-sprites ren))
 	      (time (get-internal-real-time)))
 	  (sdl2:with-event-loop (:method :poll)
 	    (:keydown
