@@ -50,15 +50,22 @@
 
 (defclass massy-object (moving-object)
   ((mass :accessor mass
-	 :initform 1.0
+	 :initform 100.0		;what is a good unit...tons?
 	 :type 'single-float
 	 :initarg :mass)))
 
-(defgeneric move (object deltat))
+(defun propagate-coasting-object (object deltat)
+  "Calculate new position and attitude given a deltat and constant rates."
+  (with-slots (pos vel attitude attitude-rate) object
+    (values (vec2+ pos (vec2* vel deltat))
+	    (mod (+ attitude attitude-rate)
+		 +full-circle+))))
+
+(defgeneric move (object deltat)
+  (:documentation "Move an object with constant rates for deltat seconds."))
 (defmethod move ((object moving-object) deltat)
   (with-slots (pos vel attitude attitude-rate) object
     (setf pos (vec2+ pos (vec2* vel deltat))
-
           attitude (mod (+ attitude attitude-rate)
                         +full-circle+))))
 
@@ -77,7 +84,7 @@
 (defclass bullet (projectile)
   ())		
 
-(defparameter *gun-reset-time* 0.5 "seconds between firing shots")
+(defparameter *gun-reset-time* 0.25 "seconds between firing shots")
 
 ;;; Maybe add # of rounds, gun temperature, etc
 (defclass gun ()
@@ -88,23 +95,68 @@
 
 (defgeneric fire (gun time))
 (defmethod fire ((gun gun) time)
-  (setf (last-fire-time gun) time))
+  (let ((reset-diff (* *gun-reset-time*
+		       internal-time-units-per-second)))
+    (when (> (- time (last-fire-time gun))
+	     reset-diff)
+      ;; (format *debug-out* "Fire w/ deltat ~D!~%"
+      ;; 	      (- time (last-fire-time gun)))
+      (setf (last-fire-time gun) time)
+      ;; TODO: actually do something
+      )))
 
 (defgeneric reload (gun round &key &allow-other-keys))
 (defmethod reload ((gun gun) round &key)
   (assert (member round '(bullet) :key #'eq))
   (setf (round-type gun) round))
 
+(defgeneric weapon-command (gun command))
+(defmethod weapon-command ((gun gun) command)
+  (when (eq (command-content command)
+	    'fire)
+    (fire gun (command-time command))))
+
 (deftype thrust-type ()
-  `(member fwd bkwd ccw cw coast))
+  `(member fwd bkwd ccw cw))
+
+;;; Thrust amounts
+(defparameter *fwd-thrust*   10)
+(defparameter *bkwd-thrust* -1)
 
 ;;; Commands are added to a queue with their timestamp for later
 ;;; processing by TICK. 
 (defclass ship (massy-object)
-  ((thrust-command :accessor thrust-command ;The user command direction
-                   :initform nil
-                   :type (or nil thrust-type))
+  ((thrust :accessor thrust
+	   :initform 0.0)
+   (thrust-command :accessor thrust-command ;The user command direction
+                   :initform ()) ;Commands are a list of all active things.
    (command-start-time :accessor command-start-time
                        :initform 0)
    (gun :accessor gun
         :initform (make-instance 'gun))))
+
+(defmethod weapon-command ((ship ship) command)
+  (weapon-command (gun ship) command))
+
+(defgeneric movement-command (ship command))
+(defmethod movement-command ((ship ship) command)
+  (let* ((deltat (- (command-time command)
+		    (timestamp ship)))
+	 (deltat-sec (/ deltat internal-time-units-per-second)))
+    ;; First set up the ship internal state to represent where we are right now.
+    (move ship deltat-sec)
+
+    ;; Then apply whatever movement offset to the rates.
+    (case (command-content command)
+      ((fwd bkwd ccw cw)
+       (if (command-set? command)
+	   (pushnew (command-content command)
+		    (thrust-command ship))
+	   (setf (thrust-command ship)
+		 (remove (command-content)
+			 (thrust-command ship))))
+       
+       (format *debug-out* "Add command ~A => ~A~%"
+       	       (command-content command)
+       	       (thrust-command ship))
+       ))))

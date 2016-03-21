@@ -27,3 +27,31 @@
 			:source-rect source-rect
 			:dest-rect (sdl2:make-rect x y w h)))))
 
+
+;;; TODO: make texture/renderer parameters in render.lisp
+(defun render (texture renderer)
+  ;; TODO: Iterate through *game-objects* to render them
+  (dolist (object *game-objects*)
+    (let* ((position (pos object))
+	   (x (mod (round (+ (vec2-x position)
+			     +half-screen-width+))
+		   +screen-width+))
+	   (y (mod (round (+ (vec2-y position)
+			     +half-screen-height+))
+		   +screen-width+)))
+      (render-texture-centered texture
+			       renderer
+			       (resource object)
+			       x
+			       y)
+      ;; (format t "(render-texture-centered texture
+      ;; 					  renderer
+      ;; 					  (resource object) == ~A
+      ;; 					  (vec2-x position) == ~A
+      ;; 					  (vec2-y position) == ~A)~%"
+      ;; 	      (resource object)
+      ;; 	      x
+      ;; 	      y)
+      ;; (force-output)
+      ;; (sdl2:push-quit-event)
+      )))
