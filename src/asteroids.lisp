@@ -2,6 +2,8 @@
 
 (in-package #:asteroids)
 
+(declaim (optimize debug))
+
 ;;; "asteroids" goes here. Hacks and glory await!
 
 (defconstant +screen-width+  640)
@@ -101,9 +103,10 @@
 	     ()
 	     (sdl2:render-clear ren)
 	     ;; (render-texture-centered sprites ren :ship 320 240)
-	     (let ((new-time (get-internal-real-time)))
-	       (tick (- new-time time))
-	       (render sprites ren)
+	     (let* ((new-time (get-internal-real-time))
+		    (delta-real-time (- new-time time)))
+	       (tick delta-real-time)
+	       (render sprites ren new-time)
 
 	       ;; Set up for next time
 	       (setf time new-time))

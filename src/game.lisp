@@ -29,6 +29,7 @@
 	(weapon (weapon-command *the-ship* command))
 	(movement (movement-command *the-ship* command))))))
 
+
 (defun tick (deltat)
   ;; TODO: Detect collisions
 

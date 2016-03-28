@@ -27,31 +27,39 @@
 			:source-rect source-rect
 			:dest-rect (sdl2:make-rect x y w h)))))
 
+(defgeneric render-object (texture renderer object deltat))
+(defmethod render-object (texture renderer object deltat)
+  (format *debug-out* "render object~%")
+  (let* ((position (pos object))
+	 (x (mod (round (+ (vec2-x position)
+			   +half-screen-width+))
+		 +screen-width+))
+	 (y (mod (round (+ (vec2-y position)
+			   +half-screen-height+))
+		 +screen-width+)))
+    (render-texture-centered texture
+			     renderer
+			     (resource object)
+			     x
+			     y)))
+(defmethod render-object (texture renderer (ship ship) new-time)
+  (let ((deltat (/ (- new-time (timestamp ship))
+		   internal-time-units-per-second)))
+    (multiple-value-bind
+	  (pos vel att) (propel ship (thrust ship) deltat)
+      (declare (ignore vel att))
+      (let* ((x (mod (round (+ (vec2-x pos)
+			       +half-screen-width+))
+		     +screen-width+))
+	     (y (mod (round (+ (vec2-y pos)
+			       +half-screen-height+))
+		     +screen-width+)))
+	(render-texture-centered texture
+				 renderer
+				 (resource ship)
+				 x
+				 y)))))
 
-;;; TODO: make texture/renderer parameters in render.lisp
-(defun render (texture renderer)
-  ;; TODO: Iterate through *game-objects* to render them
+(defun render (texture renderer new-time)
   (dolist (object *game-objects*)
-    (let* ((position (pos object))
-	   (x (mod (round (+ (vec2-x position)
-			     +half-screen-width+))
-		   +screen-width+))
-	   (y (mod (round (+ (vec2-y position)
-			     +half-screen-height+))
-		   +screen-width+)))
-      (render-texture-centered texture
-			       renderer
-			       (resource object)
-			       x
-			       y)
-      ;; (format t "(render-texture-centered texture
-      ;; 					  renderer
-      ;; 					  (resource object) == ~A
-      ;; 					  (vec2-x position) == ~A
-      ;; 					  (vec2-y position) == ~A)~%"
-      ;; 	      (resource object)
-      ;; 	      x
-      ;; 	      y)
-      ;; (force-output)
-      ;; (sdl2:push-quit-event)
-      )))
+    (render-object texture renderer object new-time)))
