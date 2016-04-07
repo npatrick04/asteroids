@@ -6,14 +6,18 @@
   :license "Specify license here"
   :depends-on (#:sdl2
                #:sdl2-image
-               #:queues.simple-queue)
+               #:queues.simple-queue
+	       #:alexandria
+	       #:fixed)
   :serial t
   :components ((:module "src"
                         :components
                         ((:file "package")
                          (:file "resources")
-                         (:file "render")
                          (:file "asteroids")
                          (:file "movement")
+			 (:file "ship")
+			 (:file "weapon")
+                         (:file "render")
                          (:file "game")))))
 

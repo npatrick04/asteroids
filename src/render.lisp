@@ -43,10 +43,10 @@
 			     x
 			     y)))
 (defmethod render-object (texture renderer (ship ship) new-time)
-  (let ((deltat (/ (- new-time (timestamp ship))
-		   internal-time-units-per-second)))
+  (declare (type game-time new-time))
+  (let ((deltat-sec (game-time (f- new-time (timestamp ship)))))
     (multiple-value-bind
-	  (pos vel att) (propel ship (thrust ship) deltat)
+	  (pos vel att) (propel ship (thrust ship) (float deltat-sec))
       (declare (ignore vel att))
       (let* ((x (mod (round (+ (vec2-x pos)
 			       +half-screen-width+))

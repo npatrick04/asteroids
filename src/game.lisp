@@ -9,6 +9,7 @@
   (push object *game-objects*))
 
 (defun initialize-game (time)
+  (declare (type game-time time))
   ;; Refresh the system!
   (setf *game-objects* ())
 
@@ -30,7 +31,7 @@
 	(movement (movement-command *the-ship* command))))))
 
 
-(defun tick (deltat)
+(defun tick (time)
   ;; TODO: Detect collisions
 
   ;; Handle ship commands
