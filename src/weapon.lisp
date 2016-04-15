@@ -11,12 +11,12 @@
 (defclass bullet (projectile)
   ())		
 
-(defparameter *gun-reset-time* (make-game-time 0.25) "seconds between firing shots")
+(defparameter *gun-reset-time* (make-real-time 0.25) "seconds between firing shots")
 
 ;;; Maybe add # of rounds, gun temperature, etc
 (defclass gun ()
   ((last-fire-time :accessor last-fire-time
-		   :type 'game-time
+		   :type 'real-time
 		   :initform (f- *gun-reset-time*))
    (round-type :accessor round-type
 	       :initform 'bullet)))

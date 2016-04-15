@@ -8,7 +8,7 @@
                #:sdl2-image
                #:queues.simple-queue
 	       #:alexandria
-	       #:fixed)
+	       #:fixed/real-time)
   :serial t
   :components ((:module "src"
                         :components

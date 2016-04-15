@@ -9,7 +9,7 @@
   (push object *game-objects*))
 
 (defun initialize-game (time)
-  (declare (type game-time time))
+  (declare (type real-time time))
   ;; Refresh the system!
   (setf *game-objects* ())
 

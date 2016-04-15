@@ -54,7 +54,7 @@
                   :type 'single-float
                   :initarg :attitude)
    (timestamp :accessor timestamp       ;The valid time of the object
-	      :type 'game-time
+	      :type 'real-time
               :initarg :timestamp)
    (resource :accessor resource
              :initform (error "Objects must be created with resources")

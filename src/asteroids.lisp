@@ -19,9 +19,6 @@
 ;; (defparameter *seconds-per-frame* (/ 1.0 *frame-rate*))
 ;; (defparameter *ireal-time-per-frame* (/ internal-time-units-per-second *frame-rate*))
 
-;;; The time in seconds, stored in decimal form with millisecond precision.
-(defdecimal game-time 3)
-
 (deftype command-type ()
   `(member movement weapon))
 
@@ -39,7 +36,7 @@
 	;; (format *debug-out* "renderer Done!~%")
 	;; (force-output *debug-out*)
 	(let ((sprites (load-sprites ren))
-	      (game-time (make-game-time-value (get-internal-real-time))))
+	      (game-time (current-time)))
 	  ;; (format *debug-out* "sprites loaded!~%")
 	  ;; (force-output *debug-out*)
 	  (initialize-game game-time)
@@ -59,7 +56,7 @@
 
 	     ;; Is there a better and less-verbose way to do this?
 	     (let ((scancode (sdl2:scancode-value keysym))
-		   (command-time (make-game-time-value (get-internal-real-time))))
+		   (command-time (current-time)))
 	       (cond
 		 ;; possibly make these configurable...probably not
 		 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
@@ -90,7 +87,7 @@
 	    (:keyup
 	     (:keysym keysym)
 	     (let ((scancode (sdl2:scancode-value keysym))
-		   (command-time (make-game-time-value (get-internal-real-time))))
+		   (command-time (current-time)))
 	       (cond
 		 ;; possibly make these configurable...probably not
 		 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
@@ -124,7 +121,7 @@
 	     ;; (format *debug-out* "idle call~%")
 	     ;; (force-output *debug-out*)
 	     (sdl2:render-clear ren)
-	     (setf (game-time-value game-time) (get-internal-real-time))
+	     (set-current-time game-time)
 	     (tick game-time)
 	     (render sprites ren game-time)
 	     (sdl2:render-present ren))

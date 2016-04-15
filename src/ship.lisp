@@ -32,8 +32,8 @@
 	   :initform 0.0)
    (thrust-command :accessor thrust-command ;The user command direction
                    :initform ())            ;Commands are a list of all active things.
-   (command-start-time :accessor command-start-time
-                       :initform 0)
+   ;; (command-start-time :accessor command-start-time
+   ;;                     :initform 0)
    (gun :accessor gun
         :initform (make-instance 'gun))))
 
@@ -81,7 +81,7 @@
 
 (defgeneric movement-command (ship command))
 (defmethod movement-command ((ship ship) command)
-  (let* ((deltat-sec (game-time (f- (command-time command)
+  (let* ((deltat-sec (real-time (f- (command-time command)
 				    (timestamp ship))))
 	 command-change)
     
