@@ -1,128 +1,59 @@
-;;;; asteroids.lisp
+(in-package :asteroids)
 
-(in-package #:asteroids)
+(defvar *asteroids* nil)
 
-(declaim (optimize debug))
+(defclass asteroid (massy-object)
+  ())
 
-;;; "asteroids" goes here. Hacks and glory await!
+(defun rpick (list)
+  "Pick an element from the list with random."
+  (elt list (random (length list))))
 
-(defconstant +screen-width+  640)
-(defconstant +screen-height+ 480)
+(defun pick-asteroid (size)
+  (ecase size
+    (:big (rpick *big-asteroids*))
+    (:medium (rpick *medium-asteroids*))
+    (:small (rpick *small-asteroids*))
+    (:any (pick-asteroid (rpick '(:big :medium :small))))))
 
-(defconstant +half-screen-width+  320)
-(defconstant +half-screen-height+ 240)
+(defparameter *min-initial-asteroid-dist* 500.0)
+(defparameter *initial-asteroid-dist-range* 1000.0)
+(defparameter *initial-asteroid-vel-range* 100.0)
+(defparameter *asteroid-rate-limit* 1700.0)
 
-(defparameter *debug-out* *standard-output*)
+(defun make-asteroid (&optional (size :big))
+  (let* ((specific-asteroid (pick-asteroid size))
+	 (asteroid (make-instance 'asteroid
+				  :resource specific-asteroid
+				  :stream (gethash specific-asteroid
+						   *sprites*)
+				  :sampler *sampler*
+				  :timestamp *game-time*))
+	 (angle (random 2pi))
+	 (radius (+ *min-initial-asteroid-dist*
+		    (random *initial-asteroid-dist-range*)))
+	 (attitude-rate (- *asteroid-rate-limit*
+			   (* 2 (random *asteroid-rate-limit*)))))
+    (setf (pos asteroid)
+	  (v:+ (center-screen)
+	       (v! (* radius (cos angle))
+		   (* radius (sin angle))))
 
-;; (defparameter *frame-rate* 50)		;cause it's an easier number of
-;; 					;milliseconds to reason about than 60.
-;; (defparameter *seconds-per-frame* (/ 1.0 *frame-rate*))
-;; (defparameter *ireal-time-per-frame* (/ internal-time-units-per-second *frame-rate*))
+	  (vel asteroid)
+	  (v! (- (/ *initial-asteroid-vel-range* 2.0)
+		 (random *initial-asteroid-vel-range*))
+	      (- (/ *initial-asteroid-vel-range* 2.0)
+		 (random *initial-asteroid-vel-range*)))
 
-(deftype command-type ()
-  `(member movement weapon))
+	  (attitude asteroid) (random +full-circle+)
 
-(defstruct command time type set? content)
-(defparameter *user-commands* (make-queue :simple-queue))
+	  (attitude-rate asteroid) (radians attitude-rate))    
+    
+    (add-object asteroid)
+    (push asteroid *asteroids*)
+    asteroid))
 
-(defun asteroids ()
-  (sdl2:with-init (:everything)
-    ;; (format *debug-out* "Init Done!~%")
-    ;; (force-output *debug-out*)
-    (sdl2:with-window (win :title "Asteroids" :w +screen-width+ :h +screen-height+ :flags '(:shown))
-      ;; (format *debug-out* "window Done!~%")
-      ;; (force-output *debug-out*)
-      (sdl2:with-renderer (ren win :flags '(:accelerated :presentvsync))
-	;; (format *debug-out* "renderer Done!~%")
-	;; (force-output *debug-out*)
-	(let ((sprites (load-sprites ren))
-	      (game-time (current-time)))
-	  ;; (format *debug-out* "sprites loaded!~%")
-	  ;; (force-output *debug-out*)
-	  (initialize-game game-time)
-	  ;; (format *debug-out* "game initialized!~%")
-	  ;; (force-output *debug-out*)
 
-	  ;; Avoid window/sdl window showing issues...
-	  ;; https://github.com/lispgames/cl-sdl2/issues/23
-	  #+win32
-	  (progn
-	    (sdl2:hide-window win)
-	    (sdl2:show-window win))
-	  
-	  (sdl2:with-event-loop (:method :poll)
-	    (:keydown
-	     (:keysym keysym)
-
-	     ;; Is there a better and less-verbose way to do this?
-	     (let ((scancode (sdl2:scancode-value keysym))
-		   (command-time (current-time)))
-	       (cond
-		 ;; possibly make these configurable...probably not
-		 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? t
-									     :content 'fwd)))
-		 ((sdl2:scancode= scancode :scancode-s) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? t
-									     :content 'bkwd)))
-		 ((sdl2:scancode= scancode :scancode-a) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? t
-									     :content 'ccw)))
-		 ((sdl2:scancode= scancode :scancode-d) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? t
-									     :content 'cw)))
-		 ((sdl2:scancode= scancode :scancode-space) (qpush *user-commands*
-								   (make-command :time command-time
-										 :type 'weapon
-										 :set? t
-										 :content 'fire))))))
-	    (:keyup
-	     (:keysym keysym)
-	     (let ((scancode (sdl2:scancode-value keysym))
-		   (command-time (current-time)))
-	       (cond
-		 ;; possibly make these configurable...probably not
-		 ((sdl2:scancode= scancode :scancode-w) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? nil
-									     :content 'fwd)))
-		 ((sdl2:scancode= scancode :scancode-s) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? nil
-									     :content 'bkwd)))
-		 ((sdl2:scancode= scancode :scancode-a) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? nil
-									     :content 'ccw)))
-		 ((sdl2:scancode= scancode :scancode-d) (qpush *user-commands*
-							       (make-command :time command-time
-									     :type 'movement
-									     :set? nil
-									     :content 'cw)))
-		 ((sdl2:scancode= scancode :scancode-space) (qpush *user-commands*
-								   (make-command :time command-time
-										 :type 'weapon
-										 :set? nil
-										 :content 'cease-fire)))
-		 ((sdl2:scancode= scancode :scancode-escape) (sdl2:push-event :quit)))))
-	    (:idle
-	     ()
-	     ;; (format *debug-out* "idle call~%")
-	     ;; (force-output *debug-out*)
-	     (sdl2:render-clear ren)
-	     (set-current-time game-time)
-	     (tick game-time)
-	     (render sprites ren game-time)
-	     (sdl2:render-present ren))
-	    (:quit () t)))))))
+(defun make-asteroids (&optional (number 10))
+  (loop for i below number do
+       (make-asteroid :any)))

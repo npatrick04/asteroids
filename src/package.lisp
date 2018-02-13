@@ -1,7 +1,10 @@
 ;;;; package.lisp
 
 (defpackage #:asteroids
-  (:use #:cl #:queues #:fixed #:fixed/real-time)
+  (:use #:cl #:fixed #:fixed/real-time
+	#:cepl #:rtg-math #:nineveh #:vari
+	#:livesupport #:cepl.skitter
+	#:cl-speedy-queue)
   (:import-from #:alexandria
 		#:define-constant)
   (:export #:asteroids))

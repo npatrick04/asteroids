@@ -1,64 +1,78 @@
 (in-package #:asteroids)
 (declaim (optimize debug))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defstruct vec2
-    (x 0.0f0 :type single-float)
-    (y 0.0f0 :type single-float)))
-(defmacro vec2-fn-s (fn &optional name)
-  "vector operation with scalar"
-  (let ((name (if name name
-		  (intern (concatenate 'string
-				       "VEC2"
-				       (string-upcase (symbol-name fn)))))))
-    `(defun ,name (a s)
-       (make-vec2 :x (,fn (vec2-x a) s)
-		  :y (,fn (vec2-y a) s)))))
+(define-constant +full-circle+ 360f0)
 
-(defmacro vec2-fn (fn &optional name)
-  "vector operation"
-  (let ((name (if name name
-		  (intern (concatenate 'string
-				       "VEC2"
-				       (string-upcase (symbol-name fn)))))))
-    `(defun ,name (a b)
-       (make-vec2 :x (,fn (vec2-x a) (vec2-x b))
-		  :y (,fn (vec2-y a) (vec2-y b))))))
-(vec2-fn-s *)
-(vec2-fn-s /)
-(vec2-fn   +)
-(vec2-fn   -)
-(vec2-fn   mod vec2mod2)
-(vec2-fn-s mod)
 
-(define-constant +full-circle+ 360.0)
-(define-constant +screen-vec2+ (make-vec2 :x (float +screen-width+)
-					  :y (float +screen-height+))
-  :test #'equalp)
+(defun vmod (vec mvec-or-scalar)
+  "Mod each element of vec by each element of mvec or scalar"
+  (let ((mvec (if (vectorp mvec-or-scalar)
+		  mvec-or-scalar
+		  (make-array (dimensions vec)
+			      :initial-element mvec-or-scalar))))
+    (map 'vector #'mod vec mvec)))
 
-(defclass moving-object ()
-  ((pos :accessor pos                   ;Meters
-	:initform (make-vec2)           ;#(0 0) is center of the screen
-	:type 'vec2                     ;#(+ +) is up and right
+(defun screen-extents ()
+  "A vector of x and y size."
+  (v:* (viewport-resolution
+	(current-viewport))
+       *screen-scale*))
+(defun center-screen ()
+  "Return the center-point of the screen in world coordinates"
+  (v:/ (screen-extents) 2f0))
+
+(defclass moving-object (thing)
+  ((pos :accessor pos		       ;Meters
+	:initform (v! 0f0 0f0)	       ;#(0 0) is center of the screen
 	:initarg :pos)
-   (vel :accessor vel                   ;Meters per second
-	:initform (make-vec2)           ;Same directional orientation as position
-	:type 'vec2
+   (vel :accessor vel	       ;Meters per second
+	:initform (v! 0f0 0f0) ;Same directional orientation as position
 	:initarg :vel)
+   (accel :accessor accel
+	  :initform 0f0
+	  :initarg :accel)
    (attitude :accessor attitude         ;Degrees
-	     :initform 0.0              ;Attitude is +degrees counter-clockwise
-	     :type 'single-float        ;Zero to the right
+	     :initform 0f0     ;Attitude is +degrees counter-clockwise
 	     :initarg :attitude)
-   (attitude-rate :accessor attitude-rate  ;Degrees per second
-                  :initform 0.0            ;Same convention as attitude
-                  :type 'single-float
-                  :initarg :attitude)
+   (attitude-rate :accessor attitude-rate ;Degrees per second
+                  :initform 0f0		  ;Same convention as attitude
+                  :initarg :attitude-rate)
    (timestamp :accessor timestamp       ;The valid time of the object
 	      :type 'real-time
               :initarg :timestamp)
    (resource :accessor resource
              :initform (error "Objects must be created with resources")
              :initarg :resource)))
+
+;;; Update the quaternion thingies.
+(defmethod draw :before ((obj moving-object))
+  (declare (optimize debug))
+  ;; Add in the rotation of the object in degrees, and attitude-rate since timestamp.
+  ;(format t "foo")
+  (with-slots (pos vel accel attitude attitude-rate timestamp)
+      obj
+    (let* ((delta-time (real-time (f- *game-time* timestamp)))
+	   (delta-attitude (* attitude-rate delta-time))
+	   (total-attitude (+ attitude delta-attitude))
+	   (attitude-rad (float (deg->rad total-attitude) 0f0))
+	   (accel-vec (v:* (v! (cos attitude-rad)
+			       (sin attitude-rad))
+			   accel))
+	   (delta-pos (v:+ (v:* vel delta-time)
+			   (v:* accel-vec
+				(* 1/2 delta-time delta-time))))
+	   (total-pos (v:+ pos delta-pos)))
+      (setf (rotv obj) (q:from-axis-angle
+			(v! 0.0 0.0 1.0)
+			(float (deg->rad attitude) 0f0)
+			;; (float (deg->rad total-attitude) 0f0)
+			)
+	    (posv obj) (v! pos 0.0)
+	    ;; (v! total-pos 0.0)
+	    ))))
+
+
+;;; --------------------------------------------
 
 (defclass massy-object (moving-object)
   ((mass :accessor mass
@@ -69,7 +83,7 @@
 (defun propagate-coasting-object (object deltat)
   "Calculate new position and attitude given a deltat and constant rates."
   (with-slots (pos vel attitude attitude-rate) object
-    (values (vec2+ pos (vec2* vel deltat))
+    (values (v:+ pos (v:* vel deltat))
 	    (mod (+ attitude attitude-rate)
 		 +full-circle+))))
 
@@ -77,23 +91,28 @@
   (:documentation "Move an object with constant rates for deltat seconds."))
 (defmethod move ((object moving-object) deltat)
   (with-slots (pos vel attitude attitude-rate) object
-    (setf pos (vec2+ pos (vec2* vel deltat))
-          attitude (mod (+ attitude attitude-rate)
+    (setf pos (vmod (v:+ pos (v:* vel deltat)) (screen-extents))
+          attitude (mod (+ attitude
+			   (* attitude-rate deltat))
                         +full-circle+))))
+
+(defmethod update ((object massy-object) delta-time)
+  (let ((dt (real-time delta-time)))
+    (move object dt)))
 
 ;;; Given a float...it's not optimal for all floats, but works for
 ;;; this use case.  
 (defun zero-ish (float)
   (< (abs float) 0.001))
 
-(defun normalize (angle &optional (range +full-circle+))
+#+nil(defun normalize (angle &optional (range +full-circle+))
   (mod angle range))
 
 (defgeneric force (object force deltat))
 (defmethod force (object force deltat)
   )
 
-(defgeneric propel (object force deltat))
+(defgeneric propel (object deltat))
 
 (defun deg->rad (deg)
   (* deg (/ pi 180.0)))
