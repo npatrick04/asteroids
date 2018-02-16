@@ -116,10 +116,25 @@
   "Do an aref on array with rounded subscripts."
   (apply #'aref array (loop for subscript across subscripts collect (round subscript))))
 
+;;; WHITE
 (defun geom-point (v4)
   "return t when geom-point is valid geometry"
   (and (> (x v4) (* 0.5 255))
        (> (y v4) (* 0.5 255))
+       (> (z v4) (* 0.5 255))))
+
+;;; RED
+(defun inside-point (v4)
+  "return t when geom-point is inside geometry"
+  (and (> (x v4) (* 0.5 255))
+       (< (y v4) (* 0.5 255))
+       (< (z v4) (* 0.5 255))))
+
+;;; BLUE
+(defun outside-point (v4)
+  "return t when geom-point is outside the geometry"
+  (and (< (x v4) (* 0.5 255))
+       (< (y v4) (* 0.5 255))
        (> (z v4) (* 0.5 255))))
 
 (defun fan-triangle (geom center)
@@ -134,71 +149,246 @@
 			(v! (v:- (elt geom j) center) 0 1))
 		  result))))
 
-(let (data)
-  (defun reset-geometry ()
-    (setf data nil))
-  (defun initialize-geometry ()
-    (setf data (make-array (texture-base-dimensions (sampler-texture *sampler*))
-			   :initial-contents (pull-g (sampler-texture *sampler*)))))
-  (defun find-geom-point (ic vec &optional max-lim)
-    "Given a starting position, find the first model-position in the direction of vec."
-    (unless data (initialize-geometry))
-    (do* ((vnorm (rtg-math.vector2:normalize vec))
-	  (pos ic (v:+ pos vnorm))
-	  (iter 0 (1+ iter))
-	  (value (garef data pos) (garef data pos)))
-	 ((or (geom-point value)
-	      (and max-lim
-		   (>= iter max-lim)))
-	  (when (geom-point value)
-	    pos))))
-  (defun geom-error (p1 p2)
-    "Return a sum of errors from p1 to p2."
-    (do* ((dx (- (x p2) (x p1)))
-	  (dy (- (y p2) (y p1)))
-	  (normal (v:normalize (v! (- dy) dx)))
-	  (iterations 0 (1+ iterations))
-	  (percent 0 (+ percent 0.1))
-	  (pos p1 (v:+ p1 (v! (* dx percent)
-			      (* dy percent))))
-	  (err 0))
-	 ((> iterations 11)
-	  (/ err (1- iterations)))
-      (unless (geom-point (garef data pos))
-	(incf err))))
-  (defun find-geometry (entity)
-    "shrink-wrap the asteroid."
-    (unless data (initialize-geometry))
-    (let* ((extents (gethash entity *extents*))
-	   (center (v:+ (v! (elt extents 0) (elt extents 1))
-			(v:/ (v! (elt extents 2) (elt extents 3)) 2)))
-	   (initial-geometry
-	    (list (find-geom-point (v:+ center (v! (/ (elt extents 2) -2.0) 0))
-				   (v! 1 0)) ; left
-		  (find-geom-point (v:+ center (v! 0 (/ (elt extents 3)  2.0)))
-				   (v! 0 -1)) ; top
-		  (find-geom-point (v:+ center (v! (/ (elt extents 2)  2.0) 0))
-				   (v! -1 0)) ; right
-		  (find-geom-point (v:+ center (v! 0 (/ (elt extents 3) -2.0)))
-				   (v! 0 1))))) ; bottom
+(defparameter *geometry-data* nil)
 
-      ;; TODO: more than just a diamond
-      ;(print triangle-fan)
+(defun reset-geometry ()
+  (setf *geometry-data* nil))
+
+(defun initialize-geometry ()
+  (setf *geometry-data*
+	(make-array (texture-base-dimensions (sampler-texture *sampler*))
+		    :initial-contents (pull-g (sampler-texture *sampler*)))))
+
+(defun find-geom-point (ic vec &key max-lim (point-test 'geom-point))
+  "Given a starting position, find the first model-position in the direction of vec."
+  (unless *geometry-data* (initialize-geometry))
+  (do* ((vnorm (rtg-math.vector2:normalize vec))
+	(pos ic (v:+ pos vnorm))
+	(iter 0 (1+ iter))
+	(value (garef *geometry-data* pos)
+	       (garef *geometry-data* pos))
+	(point-type  (funcall point-test value)
+		     (funcall point-test value)))
+       ((or point-type
+	    (and max-lim
+		 (>= iter max-lim)))
+	(when point-type pos))))
+
+(defun geom-error (p1 p2)
+  "Return the values of:
+- sum of errors from p1 to p2.
+- average of erroneous positions.
+- the normal facing outwards."
+  (declare (optimize debug))
+  (do* ((dx (- (x p2) (x p1)))
+	(dy (- (y p2) (y p1)))
+	(error-location 0)
+	(normal (v:normalize (v! dy (- dx))))
+	(iterations 0 (1+ iterations))
+	(percent 1/11 (+ percent 1/11))
+	(pos p1 (v:+ p1 (v! (* dx percent)
+			    (* dy percent))))
+	(err 0))
+       ((>= iterations 11)
+	;(break)
+	(values (/ err (1- iterations))
+		(if (plusp error-location)
+		    (v:+ p1 (v! (* dx 0.5) (* dy 0.5)))
+		    (v! 0 0))
+		normal))
+    ;(break)
+    (unless (geom-point (garef *geometry-data* pos))
+      (incf error-location percent)
+      (incf err))))
+
+(defparameter *max-error* 0.05)
+(defparameter *min-geom-detail* 2.0)
+
+#+nil
+(defun maybe-insert-point (extents center geom i j)
+  "Return new geom if a point needs to be added,
+and the next index to check."
+  (declare (optimize debug))
+  ;; Check if it needs to be checked
+  (handler-case
+      ;; (< (v:distance (elt geom i) (elt geom j))
+      ;;    *min-geom-detail*)
+					;(values geom j)
+      
+      ;; Check if it needs to be split
+      (multiple-value-bind
+	    (geom-err err-center normal)
+	  (geom-error (elt geom i)
+		      (elt geom j))
+	(if (> geom-err *max-error*)
+	    ;; Insert a new point.
+	    ;; First find the point in the direction of
+	    ;; normal that lies on the extents.
+	    (let* ((point (if (outside-point (garef *geometry-data* err-center))
+			      (find-geom-point err-center (v:negate normal)
+					       :point-test 'geom-point)
+			      (v:- (find-geom-point err-center normal
+						    :point-test 'outside-point)
+				   normal))))
+	      (values (concatenate 'list
+				   (subseq geom 0 j)
+				   (list point)
+				   (subseq geom j))
+		      i))
+	    (values geom j)))
+    (error () (values geom j))))
+
+(defun insert-geom-point (geometry i err-center normal)
+  (let* ((point (if (outside-point (garef *geometry-data* err-center))
+		    (find-geom-point err-center (v:negate normal)
+				     :point-test 'geom-point)
+		    (v:- (find-geom-point err-center normal
+					  :point-test 'outside-point)
+			 normal))))
+    (concatenate 'list
+		 (subseq geometry 0 (1+ i))
+		 (list point)
+		 (subseq geometry (1+ i)))))
+
+(defun shrink-wrap (geometry)
+  "Find all the edges."
+  (do* ((i 0)
+	(j 1 (mod (1+ i) (length geometry))))
+       ((= i (length geometry)) geometry)
+    (multiple-value-bind
+	  (geom-err err-center normal)
+	(geom-error (elt geometry i)
+		    (elt geometry j))
+      (if (plusp geom-err)
+	  (setf geometry (insert-geom-point geometry i err-center normal))
+	  (setf i (1+ i))))))
+
+(defun remove-elt (list i)
+  (if (< i (length list))
+      (concatenate 'list
+		   (subseq list 0 i)
+		   (subseq list (1+ i)))
+      (error "Cannot remove-elt with i > length of list")))
+
+(defun simplify-geometry (geometry)
+  "Eliminate excess points."
+  (declare (optimize debug))
+  (do ((i 0 (1+ i)))
+      ((>= i (length geometry)) geometry)
+    (do ((j (mod (+ 2 i) (length geometry))
+	    (mod (+ 2 i) (length geometry))))
+	((or (>= i (length geometry))
+	     (> (geom-error (elt geometry i)
+			    (elt geometry j))
+		1/10))
+	 #+nil(format t "geom error ~A ~A: ~A~%"
+		 i j
+		 (geom-error (elt geometry i)
+			     (elt geometry j))))
+      #+nil(format t "geom error ~A ~A: ~A~%"
+		 i j
+		 (geom-error (elt geometry i)
+			     (elt geometry j)))
+      (if (> j i)
+	  (setf geometry (remove-elt geometry (1+ i)))
+	  (if (> j 0)
+	      (setf geometry (remove-elt geometry (1- j)))
+	      (setf geometry (remove-elt geometry (1+ i))))))))
+
+(defun find-geometry (entity)
+  "Find the center and geometry of the asteroid."
+  (declare (optimize debug))
+  (unless *geometry-data* (initialize-geometry))
+  (let* ((extents (gethash entity *extents*))
+	 (center (v:+ (v! (elt extents 0) (elt extents 1))
+		      (v:/ (v! (elt extents 2) (elt extents 3)) 2)))
+	 (initial-geometry
+	  (list (find-geom-point (v:+ center (v! (/ (elt extents 2) -2.0) 0))
+				 (v! 1 0)) ; left
+		(find-geom-point (v:+ center (v! 0 (/ (elt extents 3)  -2.0)))
+				 (v! 0 1)) ; top
+		(find-geom-point (v:+ center (v! (/ (elt extents 2)  2.0) 0))
+				 (v! -1 0)) ; right
+		(find-geom-point (v:+ center (v! 0 (/ (elt extents 3) 2.0)))
+				 (v! 0 -1)))) ; bottom
+	 (the-geometry (simplify-geometry (shrink-wrap initial-geometry))))
+    (list center
+	  the-geometry
+	  (make-buffer-stream
+	   (make-gpu-array
+	    (mapcar (lambda (v) (v:- v center))
+		    the-geometry)
+	    :element-type :vec2
+	    :dimensions (length the-geometry))
+	   :primitive :line-loop))))
+
+#+nil
+(defun find-geometry (entity)
+  "shrink-wrap the asteroid."
+  (declare (optimize debug))
+  (unless *geometry-data* (initialize-geometry))
+  (let* ((extents (gethash entity *extents*))
+	 (center (v:+ (v! (elt extents 0) (elt extents 1))
+		      (v:/ (v! (elt extents 2) (elt extents 3)) 2)))
+	 (initial-geometry
+	  (list (find-geom-point (v:+ center (v! (/ (elt extents 2) -2.0) 0))
+				 (v! 1 0)) ; left
+		(find-geom-point (v:+ center (v! 0 (/ (elt extents 3)  -2.0)))
+				 (v! 0 1)) ; top
+		(find-geom-point (v:+ center (v! (/ (elt extents 2)  2.0) 0))
+				 (v! -1 0)) ; right
+		(find-geom-point (v:+ center (v! 0 (/ (elt extents 3) 2.0)))
+				 (v! 0 -1))))) ; bottom
+
+    ;; initial-geometry is a diamond shape around the object.
+    ;; Now check for error between points, to see where the
+    ;; geometry needs to be adjusted.
+    ;;(break)
+    (let ((the-geometry
+	   (do* ((i 0 (1+ i))
+		 (redo 0)
+		 (geom (append initial-geometry (list (first initial-geometry))))
+		 (j 1 (1+ i)))
+		((= i (1- (length geom))) (butlast geom))
+	     (if (> redo 3)
+		 (setf redo 0)
+		 (multiple-value-bind
+		       (new-geom next-i)
+		     (maybe-insert-point extents center
+					 geom
+					 i
+					 j)
+		   ;; (format t "New Geom from ~D to ~D: ~A~%"
+		   ;; 	       i next-i new-geom)
+		   (when (and (= i next-i)
+			      (> (v:distance (elt new-geom next-i)
+					     (elt new-geom (1+ next-i)))
+				 *min-geom-detail*)
+			      (> (v:distance (elt new-geom (+ 1 next-i))
+					     (elt new-geom (+ 2 next-i)))
+				 *min-geom-detail*))
+		     (incf redo)
+		     (setf geom new-geom
+			   i (1- next-i))))))))
+					;(print the-geometry)
+      
       (list center
-	    initial-geometry
+	    the-geometry
 	    (make-buffer-stream
 	     (make-gpu-array
 	      (mapcar (lambda (v) (v:- v center))
-		      initial-geometry)
+		      the-geometry)
 	      :element-type :vec2
-	      :dimensions (length initial-geometry))
-	     :primitive :line-loop))))
-  (defun fill-geometry ()
-    (maphash (lambda (k v)
-	       (declare (ignore v))
-	       (setf (gethash k *geometry*)
-		     (find-geometry k)))
-	     *extents*))
-  (defun geometry-data ()
-    (unless data (initialize-geometry))
-    data))
+	      :dimensions (length the-geometry))
+	     :primitive :line-loop)))))
+
+(defun fill-geometry ()
+  (maphash (lambda (k v)
+	     (declare (ignore v))
+	     (setf (gethash k *geometry*)
+		   (find-geometry k)))
+	   *extents*))
+
+(defun geometry-data ()
+  (unless *geometry-data* (initialize-geometry))
+  *geometry-data*)

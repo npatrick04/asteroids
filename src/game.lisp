@@ -20,14 +20,13 @@
 (defparameter *user-commands* (make-queue 32))
 
 (defun initialize-game ()
-  (setf *screen-dimensions*
-	(viewport-resolution
-	 (current-viewport)))
-  
-  (setf *game-time* (current-time))
-  (load-sprites)
+  (setf *screen-dimensions* (viewport-resolution
+			     (current-viewport))
+	*game-time* (current-time)
+	*user-commands* (make-queue 32))
 
-  (setf *user-commands* (make-queue 32))
+  (load-sprites)
+  (fill-geometry)
 
   ;; Refresh the system!
   (reset)
@@ -42,7 +41,8 @@
 	*time-running* t)
 
   (make-ship)
-  (make-asteroids))
+  (make-asteroids)
+  )
 
 (defparameter *depth* -10.0)
 
@@ -69,7 +69,7 @@
     (loop :for object in *game-objects* :do
        (update object delta-time)
        (draw-wrapping object)))
-
+#+nil
   (when (zerop (length *asteroids*))
     (format t "~&You Won!~%")
     (reset))

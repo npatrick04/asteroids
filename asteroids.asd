@@ -24,5 +24,6 @@
 			 (:file "asteroids")
 			 (:file "camera")
                          (:file "game")
-                         (:file "render")))))
+                         (:file "render")
+			 (:file "collision")))))
 

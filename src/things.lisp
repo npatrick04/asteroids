@@ -51,23 +51,20 @@
 
     (setf (pos thing) pos)
     (draw thing)))
-#+nil
-(defmethod draw ((thing thing))
-  (map-g #'asteroid-pipeline (buf-stream thing)
-         :scale (scale thing)
-         :model->world (get-model->world-space thing)
-         :albedo (sampler thing)))
+
+(defparameter *draw-geometry* nil)
 
 (defmethod draw ((thing thing))
   (map-g #'asteroid-pipeline (buf-stream thing)
          :scale (scale thing)
          :model->world (get-model->world-space thing)
          :albedo (sampler thing))
-  (destructuring-bind
-	(center geom stream) (gethash (resource thing) *geometry*)
-    (declare (ignore center geom))
-    (gl:line-width 2.0)
-    (map-g #'geom-pipeline stream
+  (when *draw-geometry*
+    (destructuring-bind
+	  (center geom stream) (gethash (resource thing) *geometry*)
+      (declare (ignore center geom))
+      (gl:line-width 2.0)
+      (map-g #'geom-pipeline stream
 					;:center center
-	   :hit (if (hit thing) 1.0 0.0)
-	   :model->world (get-model->world-space thing))))
+	     :hit (if (hit thing) 1.0 0.0)
+	     :model->world (get-model->world-space thing)))))

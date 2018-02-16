@@ -295,6 +295,9 @@
 				  :set? t
 				  :content 'cease-fire)
 		    *user-commands*)))
+
+    (when (eq (key-edge-p key.g) :down)
+      (setf *draw-geometry* (not *draw-geometry*)))
     (when (key-down-p key.escape)
       (format t "Figure out how to quit!~%")
       ;; maybe (sdl2:push-event :quit)
