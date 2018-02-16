@@ -1,10 +1,10 @@
 A common lisp asteroids implementation using CEPL.
 
-[Asteroids screenshot](doc/asteroids.PNG)
+<img src="doc/asteroids.PNG" alt="Asteroids screenshot" class="inline"/>
 
 Press g to get a geometry overlay.
 
-[With geometry](doc/with-geometry.PNG)
+<img src="doc/with-geometry.PNG" alt="With geometry" class="inline"/>
 
 # To play
 
