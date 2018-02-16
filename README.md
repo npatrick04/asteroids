@@ -8,7 +8,7 @@ Press g to get a geometry overlay.
 
 # To play
 
-Clone the repository to a [quicklisp accessible location][https://www.quicklisp.org/beta/].
+Clone the repository to a [quicklisp accessible location](https://www.quicklisp.org/beta/).
 
 ```lisp
 (ql:quickload :asteroids)
