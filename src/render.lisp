@@ -130,16 +130,4 @@
   (bullet-vert :vec3)
   (bullet-frag))
 
-(defparameter *screen-scale* 10.0)
 
-(defun upload-uniforms-for-camera (camera)
-  (setf *screen-dimensions*
-	(viewport-resolution
-	 (current-viewport)))
-  #+nil(let ((scale (the single-float *screen-scale*)))
-    (map-g #'asteroid-pipeline nil
-	   :world->view (get-world->view-space camera)
-	   :view->clip (projection
-			camera
-			(* scale 320.0)
-			(* scale 240.0)))))

@@ -10,7 +10,10 @@
 (defvar *screen-dimensions* (v! 240.0f0 480.0f0))
 (defparameter *blending* (make-blending-params))
 
+;;; a fixed point real-time type, because i can
 (defvar *game-time* (current-time))
+
+(defparameter *time-running* t)
 
 (deftype command-type ()
   `(member movement weapon))
@@ -41,22 +44,13 @@
 	*time-running* t)
 
   (make-ship)
-  (make-asteroids)
-  )
-
-(defparameter *depth* -10.0)
-
-;;; A list of pairs
-(defvar *colliding-objects* nil)
+  (make-asteroids))
 
 (defun tick (delta-time)
   (step-host)
   (update-repl-link)
 
   (clear)
-
-  ;; (update *camera* (float (real-time delta-time)))
-  ;; (upload-uniforms-for-camera *camera*)
 
   (handle-user-commands)
 
@@ -69,15 +63,13 @@
     (loop :for object in *game-objects* :do
        (update object delta-time)
        (draw-wrapping object)))
-#+nil
+
   (when (zerop (length *asteroids*))
     (format t "~&You Won!~%")
     (reset))
 
   (swap)
   (decay-events))
-
-(defparameter *time-running* t)
 
 (defun run-step ()
   (if *time-running*

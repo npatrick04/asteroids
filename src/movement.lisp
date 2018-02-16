@@ -1,8 +1,8 @@
 (in-package #:asteroids)
 (declaim (optimize debug))
 
+(defparameter *screen-scale* 10.0)
 (define-constant +full-circle+ 360f0)
-
 
 (defun vmod (vec mvec-or-scalar)
   "Mod each element of vec by each element of mvec or scalar"
@@ -12,11 +12,13 @@
 			      :initial-element mvec-or-scalar))))
     (map 'vector #'mod vec mvec)))
 
+
 (defun screen-extents ()
   "A vector of x and y size."
   (v:* (viewport-resolution
 	(current-viewport))
        *screen-scale*))
+
 (defun center-screen ()
   "Return the center-point of the screen in world coordinates"
   (v:/ (screen-extents) 2f0))
